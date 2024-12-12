@@ -1,15 +1,11 @@
 name: API Proxy
 on:
-  issues:
-    types: [opened]
-
-permissions:
-  issues: write
+  repository_dispatch:   # 使用 repository_dispatch 事件
+    types: [proxy-request]
 
 jobs:
   proxy:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.title, 'chat-proxy-')
     steps:
       - name: Process Request
         uses: actions/github-script@v6
@@ -17,15 +13,10 @@ jobs:
           script: |
             const axios = require('axios');
             try {
-              console.log('Processing new request...');
+              console.log('Processing request...');
+              const { apiKey, messages } = context.payload.client_payload;
               
-              // 从 issue body 解析请求数据
-              const requestData = JSON.parse(github.event.issue.body);
-              const { apiKey, messages } = requestData;
-              
-              console.log('Sending request to API...');
-              
-              // 发送请求到 API
+              // 发送请求到实际的 API
               const response = await axios({
                 method: 'POST',
                 url: 'https://api.kksjj.org/v1/chat/completions',
@@ -40,43 +31,10 @@ jobs:
                 timeout: 30000
               });
               
-              console.log('Received API response');
-              
-              // 将响应添加到 issue 评论中
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: JSON.stringify(response.data)
-              });
-              
-              console.log('Created response comment');
-              
-              // 关闭 issue
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                state: 'closed'
-              });
-              
-              console.log('Closed issue');
+              console.log('Request successful');
+              return response.data;
               
             } catch (error) {
-              console.error('Error occurred:', error);
-              
-              // 发生错误时，添加错误信息到评论
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: `Error: ${error.message}`
-              });
-              
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                state: 'closed'
-              });
+              console.error('Error:', error);
+              throw error;
             }
