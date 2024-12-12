@@ -1,7 +1,8 @@
 name: API Proxy
 on:
-  repository_dispatch:   # 使用 repository_dispatch 事件
+  repository_dispatch:
     types: [proxy-request]
+  workflow_dispatch:  # 添加手动触发选项，方便测试
 
 jobs:
   proxy:
@@ -11,12 +12,11 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            console.log('Processing request...');
             const axios = require('axios');
             try {
-              console.log('Processing request...');
               const { apiKey, messages } = context.payload.client_payload;
               
-              // 发送请求到实际的 API
               const response = await axios({
                 method: 'POST',
                 url: 'https://api.kksjj.org/v1/chat/completions',
@@ -26,15 +26,23 @@ jobs:
                 },
                 data: {
                   model: 'gpt-3.5-turbo',
-                  messages: messages
+                  messages: messages,
+                  temperature: 0.7,
+                  max_tokens: 2000
                 },
                 timeout: 30000
               });
               
               console.log('Request successful');
-              return response.data;
+              return {
+                status: 'success',
+                data: response.data
+              };
               
             } catch (error) {
               console.error('Error:', error);
-              throw error;
+              return {
+                status: 'error',
+                message: error.message
+              };
             }
