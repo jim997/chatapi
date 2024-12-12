@@ -2,20 +2,38 @@ name: API Proxy
 on:
   repository_dispatch:
     types: [proxy-request]
-  workflow_dispatch:  # 添加手动触发选项，方便测试
+  workflow_dispatch:
+    inputs:
+      apiKey:
+        description: 'API Key'
+        required: true
+      messages:
+        description: 'Messages'
+        required: true
+
+permissions: write-all
 
 jobs:
   proxy:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install Dependencies
+        run: npm install axios
+
       - name: Process Request
         uses: actions/github-script@v6
         with:
           script: |
-            console.log('Processing request...');
             const axios = require('axios');
+            console.log('Processing request...');
             try {
-              const { apiKey, messages } = context.payload.client_payload;
+              const apiKey = context.payload.client_payload?.apiKey || context.inputs.apiKey;
+              const messages = context.payload.client_payload?.messages || JSON.parse(context.inputs.messages);
               
               const response = await axios({
                 method: 'POST',
